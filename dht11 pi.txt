@@ -1,0 +1,42 @@
+import time
+import board
+import adafruit_dht
+from urllib.request import urlopen
+
+# Your ThingSpeak Write API key
+WRITE_API = "VKKR46HZHROGLZAO"
+
+# Base URL for ThingSpeak
+BASE_URL = "https://api.thingspeak.com/update?api_key={}".format(WRITE_API)
+
+# Initialize the DHT11 sensor on GPIO19
+dhtDevice = adafruit_dht.DHT11(board.D19)
+
+try:
+    while True:
+        # Read sensor data
+        temperature = dhtDevice.temperature
+        humidity = dhtDevice.humidity
+
+        # Print to terminal
+        print("Humidity = {:.2f}%  Temperature = {:.2f}C".format(humidity, temperature))
+
+        # Build the ThingSpeak URL
+        thingspeak_http = BASE_URL + "&field1={:.2f}&field2={:.2f}".format(
+            temperature, humidity
+        )
+
+        # Send to ThingSpeak
+        conn = urlopen(thingspeak_http)
+        print("Response:", conn.read())
+        conn.close()
+
+        # Wait 15 s between uploads
+        time.sleep(15)
+
+except KeyboardInterrupt:
+    print("Program stopped by user.")
+    try:
+        conn.close()
+    except:
+        pass
