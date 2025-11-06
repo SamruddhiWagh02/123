@@ -1,0 +1,28 @@
+int LEDpin = 13;        // Onboard LED on Arduino Uno
+int ObstaclePin = 10;   // Input pin from obstacle sensor
+int hasObstacle = LOW;  // LOW means no obstacle
+
+void setup()
+{
+  pinMode(LEDpin, OUTPUT);       // Set LED pin as output
+  pinMode(ObstaclePin, INPUT);   // Set sensor pin as input
+  Serial.begin(9600);            // Start serial communication
+}
+
+void loop()
+{
+  hasObstacle = digitalRead(ObstaclePin);  // Read sensor value
+
+  if (hasObstacle == HIGH)  // If obstacle detected
+  {
+    Serial.println("Stop! Something is ahead!!");
+    digitalWrite(LEDpin, HIGH);  // Turn ON LED
+  }
+  else  // No obstacle detected
+  {
+    Serial.println("Path is clear");
+    digitalWrite(LEDpin, LOW);   // Turn OFF LED
+  }
+
+  delay(200); // Small delay for stability
+}
