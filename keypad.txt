@@ -1,0 +1,126 @@
+-------------------------------------------------------------------------------
+-- Title				:	Keypad interfacing to FPGA
+-------------------------------------------------------------------------------
+-- Description		:	Displays the value of key pressed on the 7-segment display
+-----------------------------------------------------------------------------
+-- Organization	:	Smart Logic Technologies, Pune
+-------------------------------------------------------------------------------
+
+library IEEE;
+use IEEE.std_logic_1164.all;
+use IEEE.std_logic_arith.all;
+use IEEE.std_logic_unsigned.all;
+-------------------------------------------------------------------------------
+entity keypad_interface is
+    port (
+			clk			: in  std_logic; 	    						-- system clock
+			reset     	: in  std_logic; 	    						-- System Reset       
+			rows			: in  std_logic_vector(3 downto 0);		-- Rows
+			Columns		: out std_logic_vector(3 downto 0);		-- Columns
+			key_press	: out std_logic;								-- key pressed
+			seg_en		: out std_logic_vector(3 downto 0);		-- 7-seg enable
+			seg_disp		: out std_logic_vector(7 downto 0) 		-- 7-segment display
+    );
+end keypad_interface;
+-------------------------------------------------------------------------------
+architecture keypad_arch of keypad_interface is
+-------------------------------------------------------------------------------
+signal scan_clk		: 	std_logic; 	--scan clock
+signal debounce_clk	: 	std_logic;  	-- debounce clock    
+signal clk_div 		: 	std_logic_vector(14 downto 0);      	    
+signal col_signal   	:  std_logic_vector(3 downto 0);
+signal D		     		:  std_logic_vector(5 downto 0);
+signal key_in  		:  std_logic;
+signal key_press_sig :  std_logic;
+signal key_code_s    :  std_logic_vector(7 downto 0);
+--b885 3.5
+begin
+
+
+seg_en 		<= "1000" ;
+key_press	<= key_press_sig;
+columns 		<= col_signal;
+
+scan_clk  	<= clk_div(14);
+debounce_clk<= clk_div(8);
+
+
+
+
+-- Clock divider
+    process(clk,reset)
+    begin
+    	if reset = '1' then 
+    		clk_div	<= (others=>'0');
+    	 elsif clk'event and clk='1' then
+        	clk_div <= clk_div +1;
+        end if ;
+    end process;
+
+
+--	SCAN PATTERN GENERATOR
+	process(scan_clk,reset)
+	begin
+		if(reset = '1')then
+			col_signal <= "1110";
+		elsif(scan_clk'event and scan_clk = '0')then
+    		col_signal <= col_signal(0) & col_signal(3 downto 1);
+		end if;
+	end process;
+-------------------------------------------------------------------------------          
+-- process for key press detection
+key_in <= '1' when rows(0)='0' or rows(1)='0' or rows(2)='0' or rows(3)='0' else
+          '0';
+-------------------------------------------------------------------------------
+--	DEBOUNCING THE 'OR' VALUE FOR 6 CLOCK CYCLES
+	process(debounce_clk, reset)
+	begin
+		if(reset = '1')then
+			D <= (others => '0');
+		elsif(debounce_clk'event and debounce_Clk = '0')then
+			D <= key_in & D(5 downto 1);
+	    end if;
+	end process;
+-------------------------------------------------------------------------------            
+-- GENERATING INTERRUPT IF FOR 6 CLOCKS THE KEY IS PRESSED
+-- Valid key hit
+key_press_sig <= D(0) and D(1) and D(2) and D(3) and D(4) and D(5);
+
+     
+-------------------------------------------------------------------------------
+--	FOR LATCHING THE VALID KEY PRESSED
+	process(key_press_sig, rows, reset )
+	begin
+		if reset = '1' then
+			key_code_s <= (others=>'0');
+		elsif( key_press_sig = '1'and key_press_sig'event )then
+			key_code_s <= col_signal & rows;
+        end if;
+	end process;
+-------------------------------------------------------------------------------
+
+			  
+-- Changing the key values in 7-segment coding.
+with key_code_s select
+--          abcdefgdp
+seg_disp <=	"00000011" when "11101110",   -- 0
+           	"10011111" when "11101101",   -- 1    
+           	"00100101" when "11101011",   -- 2
+            "00001101" when "11100111",   -- 3
+            "10011001" when "11011110",   -- 4
+            "01001001" when "11011101",   -- 5
+            "01000001" when "11011011",   -- 6
+            "00011111" when "11010111",   -- 7
+            "00000001" when "10111110",   -- 8
+            "00001001" when "10111101",   -- 9
+            "00000101" when "10111011",   -- A
+            "11000001" when "10110111",   -- B
+            "01100011" when "01111110",   -- C
+            "10000101" when "01111101",   -- D
+            "01100001" when "01111011",   -- E
+            "01110001" when "01110111",   -- F
+            "00000000" when others;
+
+
+end keypad_arch;
+-------------------------------------------------------------------------------
