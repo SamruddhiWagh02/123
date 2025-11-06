@@ -1,0 +1,267 @@
+-------------------------------------------------------------------------------
+-- Title			:	LCD Controller in FPGA.
+-------------------------------------------------------------------------------
+-- Description		:	Displays the String on LCD
+-------------------------------------------------------------------------------
+-- Organization		:	Smart Logic Technologies, Pune
+-------------------------------------------------------------------------------
+
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+
+entity LCD_FPGA_FSM is
+generic(rst_state:std_logic:='1');		-- for USDP it is Active LOW
+    Port ( rst : in std_logic; 		-- reset
+           clk_12Mhz : in std_logic;		-- high freq. clock
+           lcd_rs : out std_logic;		-- LCD RS control
+           lcd_en : out std_logic;		-- LCD Enable
+           lcd_data : out std_logic_vector(7 downto 0));	-- LCD Data port
+end LCD_FPGA_FSM;
+
+architecture Behavioral of LCD_FPGA_FSM is
+signal div : std_logic_vector(20 downto 0); --- delay timer 1
+signal clk_t1,lcd_rs_s,lcd_en_s ,line2,line2_clk1: std_logic;
+-- LCD controller FSM states
+type state is (reset,func,addr_1st,addr_2nd,mode,cur,clear,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11,
+			d12,d13,d14,d15,hold,extra);
+signal ps,nx	: state;
+signal dataout_s  : std_logic_vector(7 downto 0); --- internal data command multiplexer
+begin
+
+lcd_en <= lcd_en_s; 
+lcd_rs <= lcd_rs_s;
+
+----- clk divider ---------------------------------
+process(rst,clk_12Mhz)
+begin
+if(rst = rst_state)then
+	div <= (others=>'0');
+elsif( clk_12Mhz'event and clk_12Mhz ='1')then
+	div <= div + 1;
+end if;
+end process;
+----------------------------------------------------
+clk_t1 <= div(15);
+
+----- Presetn state Register -----------------------
+process(rst,clk_t1)
+begin
+if(rst = rst_state)then
+	ps 	<= reset;
+	line2	<= '0';	---to display "Smart Logic Tech"
+elsif( clk_t1'event and clk_t1 ='1')then
+	ps	<= nx;
+	if ps = extra then
+		line2	<= '1';	-- to display "lcd demo in vhdl"
+   end if;
+end if;
+end process;
+----- state and output  decoding process 
+process(rst,ps,line2)
+begin
+case(ps) is
+
+when reset =>
+			nx	<= func;
+	    	lcd_rs_s	<= '0';
+			dataout_s	<= "00111000";		-- 38h
+			
+when func	=>
+			nx	<= mode;
+			lcd_rs_s	<= '0';
+			dataout_s	<= "00111000";		-- 38h
+when mode	=>
+			nx	<= cur;
+			lcd_rs_s	<= '0';
+			dataout_s	<= "00000110";		-- 06h
+when cur	=>
+			nx	<= addr_1st;	   
+			lcd_rs_s	<= '0';
+			dataout_s	<= "00001100";		-- 0Ch  curser at starting point of line1
+when addr_1st	=>		                   -- line-1 display adress
+			nx	<= clear;
+			lcd_rs_s	<= '0';
+			dataout_s	<= "10110000";		-- 80h  
+when clear=>
+			nx	<= d0;
+			lcd_rs_s	<= '0';
+			dataout_s	<= "00000001";		-- 01h
+when d0	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01010011";		-- S
+			else
+			dataout_s	<= "01001100";		-- L
+			end if;
+				nx	<= d1;
+
+when d1	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01101101";		-- m
+			else
+			dataout_s	<= "01000011";		-- C
+			end if;
+			nx	<= d2;
+			
+when d2	=>
+			
+			lcd_rs_s	<= '1';	 
+			if line2='0' then
+			dataout_s	<= "01100001";		-- a
+			else
+			dataout_s	<= "01000100";		-- D
+			end if;	
+			nx	<= d3;
+when d3	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01110010";		-- r
+			else
+			dataout_s	<= "00100000";		-- space
+			end if;	
+			nx	<= d4;
+--			LCD Demo in VHDL
+when d4	=>
+		
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01110100";		-- r
+			else
+			dataout_s	<= "01100100";		-- d
+			end if;	
+			nx	<= d5;
+			
+when d5	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "00100000";		-- space
+			else
+			dataout_s	<= "01100101";		-- e
+			end if;	
+			
+			nx	<= d6;
+			
+when d6	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01001100";		-- L
+			else
+			dataout_s	<= "01101101";		-- m
+			end if;
+			nx	<= d7;
+			
+when d7	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01101111";		-- 0
+			else
+			dataout_s	<= "01101111";		-- o
+			end if;
+			nx	<= d8;
+			
+when d8	=>
+			lcd_rs_s	<= '1';
+			if line2='0' then
+			dataout_s	<= "01100111";		-- g
+			else
+			dataout_s	<= "00100000";		-- Space
+			end if;
+			nx	<= d9;
+			
+when d9	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+			dataout_s	<= "01101001";		-- i
+			else
+			dataout_s	<= "01101001";		-- i
+			end if;
+			nx	<= d10;
+when d10	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+				dataout_s	<= "01100011";		-- c
+		  	else
+				dataout_s	<= "01101110";		-- n
+		  	end if;
+			nx	<= d11;	
+when d11	=>
+			
+			lcd_rs_s	<= '1';
+			dataout_s	<= "00100000";		-- Space
+			nx<=d12;
+				
+when d12	=>
+
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+			dataout_s	<= "01010100";		-- T
+			else
+			dataout_s	<= "01010110";		-- V
+			end if;
+			nx	<= d13;
+
+when d13	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+			dataout_s	<= "01100101";		-- e
+			else
+			dataout_s	<= "01001000";		-- H
+			end if;
+			nx	<= d14;
+
+when d14	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+			dataout_s	<= "01100011";		-- c
+			else
+			dataout_s	<= "01000100";		-- D
+			end if;
+			nx	<= d15;
+when d15	=>
+			
+			lcd_rs_s	<= '1';
+			if line2='0' then 
+			dataout_s	<= "01101000";		-- c
+			else
+			dataout_s	<= "01001100";		-- L
+			end if;
+			nx	<= addr_2nd;
+				
+when addr_2nd	=>		  --- line-2 display adress
+			lcd_rs_s	<= '0';
+		  	if line2='1' then
+			nx			<= addr_2nd;
+			else
+			nx			<= extra;
+			dataout_s	<= "11000000";		-- C0h  -- curser at  starting point of line2
+			
+			end if;
+			
+
+when  extra	=>
+			nx	<= d0;	   
+			lcd_rs_s	<= '0';
+			dataout_s	<= "11000000";		-- C0h
+
+when others=>
+			nx	<= reset;
+			lcd_rs_s	<= '0';
+			dataout_s	<= "00000001";		-- CLEAR
+end case;
+end process;
+
+-------------------------------------------------------
+lcd_en_s <= clk_t1;
+lcd_data <= dataout_s;
+
+end Behavioral;
